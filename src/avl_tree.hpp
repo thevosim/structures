@@ -1,137 +1,260 @@
-#include <string>
-#include <gtest/gtest.h>
-#include <cmath>
+#ifndef AVL_TREE_HPP
+#define AVL_TREE_HPP
+
 #include <algorithm>
-#include <random>
-#include <map>
-#include "avl_tree.hpp"
-/*
-** AVL-TREE TESTS FIXTURE
-*/
-class AVLTreeTest : public ::testing::Test {
-protected:
-    template <typename T>
-    void assertStructure(const AVLTree<T>& tree, const T& expectedRoot, const T& expectedLeft, const T& expectedRight, int expectedHeight) {
-        auto* r = tree.root;
-        ASSERT_NE(r, nullptr);
-        EXPECT_EQ(r->key, expectedRoot);
-        ASSERT_NE(r->left, nullptr);
-        ASSERT_NE(r->right, nullptr);
-        EXPECT_EQ(r->left->key, expectedLeft);
-        EXPECT_EQ(r->right->key, expectedRight);
-        EXPECT_EQ(r->height, expectedHeight);
+#include <iostream>
+#include <vector>
+#include <string>
+
+template <typename T>
+class AVLTree
+{
+    friend class AVLTreeTest;
+private:
+    struct Node
+    {
+        T key;
+        int height;
+        Node* left;
+        Node* right;
+
+        Node(T k) : key(k), height(1), left(nullptr), right(nullptr)
+        {
+        }
+    };
+
+    Node* root;
+
+    int height(Node* p)
+    {
+        return p ? p->height : 0;
     }
 
-    template <typename T>
-    int checkAVLPropertyInternal(typename AVLTree<T>::Node* node) {
-        if (!node) return 0;
-
-        int leftHeight = checkAVLPropertyInternal<T>(node->left);
-        int rightHeight = checkAVLPropertyInternal<T>(node->right);
-
-        EXPECT_TRUE(node->left == nullptr || node->left->key < node->key);
-        EXPECT_TRUE(node->right == nullptr || node->right->key > node->key);
-
-        int diff = std::abs(leftHeight - rightHeight);
-        EXPECT_LE(diff, 1);
-
-        EXPECT_EQ(node->height, std::max(leftHeight, rightHeight) + 1);
-
-        return node->height;
+    int bfactor(Node* p)
+    {
+        return p ? height(p->right) - height(p->left) : 0;
     }
 
-    template <typename T>
-    void verifyTree(const AVLTree<T>& tree) {
-        checkAVLPropertyInternal<T>(tree.root);
+    void fixheight(Node* p)
+    {
+        int hl = height(p->left);
+        int hr = height(p->right);
+        p->height = std::max(hl, hr) + 1;
     }
 
-    template <typename T>
-    void verifyTreeAndHeight(const AVLTree<T>& tree, int numElements) {
-        int h = checkAVLPropertyInternal<T>(tree.root);
-        int maxHeight = static_cast<int>(1.44 * std::log2(numElements + 2));
-        EXPECT_LE(h, maxHeight);
+    Node* rotateRight(Node* p)
+    {
+        Node* q = p->left;
+        p->left = q->right;
+        q->right = p;
+        fixheight(p);
+        fixheight(q);
+        return q;
+    }
+
+    Node* rotateLeft(Node* q)
+    {
+        Node* p = q->right;
+        q->right = p->left;
+        p->left = q;
+        fixheight(q);
+        fixheight(p);
+        return p;
+    }
+
+    Node* balance(Node* p)
+    {
+        fixheight(p);
+
+        if (bfactor(p) == 2)
+        {
+            if (bfactor(p->right) < 0)
+            {
+                p->right = rotateRight(p->right);
+            }
+            return rotateLeft(p);
+        }
+
+        if (bfactor(p) == -2)
+        {
+            if (bfactor(p->left) > 0)
+            {
+                p->left = rotateLeft(p->left);
+            }
+            return rotateRight(p);
+        }
+
+        return p;
+    }
+    Node* find(Node* p, const T& k)
+    {
+        if (!p)
+        {
+            return nullptr;
+        }
+
+        if (k < p->key)
+        {
+            return find(p->left, k);
+        }
+        if (k > p->key)
+        {
+            return find(p->right, k);
+        }
+
+        return p;
+    }
+
+    const Node* find(Node* p, const T& k) const
+    {
+        if (!p)
+        {
+            return nullptr;
+        }
+
+        if (k < p->key)
+        {
+            return find(p->left, k);
+        }
+        if (k > p->key)
+        {
+            return find(p->right, k);
+        }
+
+        return p;
+    }
+    Node* insert(Node* p, T k)
+    {
+        if (!p)
+        {
+            return new Node(k);
+        }
+
+        if (k < p->key)
+        {
+            p->left = insert(p->left, k);
+        }
+        else if (k > p->key)
+        {
+            p->right = insert(p->right, k);
+        }
+        else
+        {
+            p->key = k;
+            return p;
+        }
+
+        return balance(p);
+    }
+    Node* findMin(Node* p)
+    {
+        return p->left ? findMin(p->left) : p;
+    }
+    Node* removeMin(Node* p)
+    {
+        if (!p->left) return p->right;
+        p->left = removeMin(p->left);
+        return balance(p);
+    }
+    Node* remove(Node* p, T k)
+    {
+        if (!p) return nullptr;
+
+        if (k < p->key)
+        {
+            p->left = remove(p->left, k);
+        }
+        else if (k > p->key)
+        {
+            p->right = remove(p->right, k);
+        }
+        else
+        {
+            Node* q = p->left;
+            Node* r = p->right;
+            delete p;
+
+            if (!r) return q;
+
+            Node* min = findMin(r);
+            min->right = removeMin(r);
+            min->left = q;
+            return balance(min);
+        }
+        return balance(p);
+    }
+    void inorder(Node* p)
+    {
+        if (!p)
+        {
+            return;
+        }
+        inorder(p->left);
+        std::cout << p->key << " ";
+        inorder(p->right);
+    }
+
+    void destroy(Node* p)
+    {
+        if (p)
+        {
+            destroy(p->left);
+            destroy(p->right);
+            delete p;
+        }
+    }
+    void collectAll(Node* p, std::vector<T>& vec) 
+    {
+        if (!p) return;
+        collectAll(p->left, vec);
+        vec.push_back(p->key);
+        collectAll(p->right, vec);
+    }
+    
+
+public:
+    struct TableItem 
+    {
+        std::string key;
+        T value;
+
+        bool operator<(const TableItem& o) const { return key < o.key; }
+        bool operator>(const TableItem& o) const { return key > o.key; }
+        bool operator==(const TableItem& o) const { return key == o.key; }
+    };
+
+    void collectAll(std::vector<T>& vec) 
+    {
+        collectAll(root, vec);
+    }
+
+    AVLTree() : root(nullptr)
+    {
+    }
+
+    ~AVLTree()
+    {
+        destroy(root);
+    }
+
+    void insert(T k)
+    {
+        root = insert(root, k);
+    }
+    void remove(T k)
+    {
+        root = remove(root, k);
+    }
+    void print()
+    {
+        inorder(root);
+        std::cout << std::endl;
+    }
+    const T* find(const T& k) const
+    {
+        const Node* p = find(root, k);
+        return p ? &p->key : nullptr;
     }
 };
 
-/*
-** AVL-TREE TEST CASES
-*/
-
-TEST_F(AVLTreeTest, HandlesLeftLeftCase) {
-    AVLTree<int> tree;
-
-    tree.insert(30);
-    tree.insert(20);
-    tree.insert(10);
-
-    assertStructure(tree, 20, 10, 30, 2);
-}
-
-TEST_F(AVLTreeTest, HandlesRightRightCase) {
-    AVLTree<int> tree;
-
-    tree.insert(10);
-    tree.insert(20);
-    tree.insert(30);
-
-    assertStructure(tree, 20, 10, 30, 2);
-}
-
-TEST_F(AVLTreeTest, HandlesLeftRightCase) {
-    AVLTree<int> tree;
-
-    tree.insert(30);
-    tree.insert(10);
-    tree.insert(20);
-
-    assertStructure(tree, 20, 10, 30, 2);
-}
-
-TEST_F(AVLTreeTest, HandlesRightLeftCase) {
-    AVLTree<int> tree;
-
-    tree.insert(10);
-    tree.insert(30);
-    tree.insert(20);
-
-    assertStructure(tree, 20, 10, 30, 2);
-}
-
-TEST_F(AVLTreeTest, UpdatesHeightCorrectlyOnComplexInsertions) {
-    AVLTree<int> tree;
-
-    tree.insert(50);
-    tree.insert(25);
-    tree.insert(75);
-    tree.insert(15);
-    tree.insert(40);
-    tree.insert(60);
-    tree.insert(90);
-    tree.insert(35);
-
-    verifyTree(tree);
-}
-
-TEST_F(AVLTreeTest, SequentialInsertionMaintainsLogNHeight) {
-    AVLTree<int> tree;
-    const int numElements = 10000;
-
-    for (int i = 1; i <= numElements; ++i) {
-        tree.insert(i);
-    }
-
-    verifyTreeAndHeight(tree, numElements);
-}
-
-TEST_F(AVLTreeTest, RandomInsertionMaintainsBalance) {
-    AVLTree<int> tree;
-    const int numElements = 50000;
-    std::mt19937 gen(42); 
-    std::uniform_int_distribution<int> dist(-100000, 100000);
-
-    for (int i = 0; i < numElements; ++i) {
-        tree.insert(dist(gen));
-    }
-
-    verifyTree(tree);
-}
+#endif
