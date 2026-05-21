@@ -132,3 +132,4 @@ TEST_F(UnorderedTableTests, StressTestMassiveErase)
     EXPECT_EQ(map.size(), count / 2);
     EXPECT_EQ(map.find(0), map.end());
     EXPECT_NE(map.find(1), map.end());
+}
